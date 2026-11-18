@@ -5,6 +5,7 @@ Run from the project root:
     python -m src.main                      # run every built-in profile
     python -m src.main "Chill Lofi"         # run one profile by name
     python -m src.main ask "深夜写代码 别太吵"  # ask in plain language
+    python -m src.main ask "chill lofi" --trace
 
 Only `python -m src.main` is supported. Running the file directly would need a
 dual-import fallback in every module of the project, which is a trap rather
@@ -13,12 +14,13 @@ than a feature.
 
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
+from src.agent import AgentResult, RecommendationAgent
 from src.catalog import CatalogError, load_songs
-from src.nlu import ParsedRequest, Slot, clarification, resolve_request
-from src.recommender import MAX_SCORE, Song, UserProfile, rank
-from src.retrieval import Retriever
+from src.nlu import ParsedRequest, Slot, clarification
+from src.recommender import MAX_SCORE, ScoreBreakdown, Song, UserProfile, rank
+from src.retrieval import Hit, Retriever
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = PROJECT_ROOT / "data" / "songs.csv"
@@ -53,6 +55,17 @@ def load_catalog() -> List[Song]:
         raise SystemExit(2)
 
 
+def print_breakdowns(breakdowns: Sequence[ScoreBreakdown]) -> None:
+    for position, breakdown in enumerate(breakdowns, start=1):
+        song = breakdown.song
+        print(
+            f"{position}. {song.title} - {song.artist}  "
+            f"({breakdown.total:.2f}/{MAX_SCORE:.2f})"
+        )
+        print(f"   because: {breakdown.text()}")
+    print()
+
+
 def show_recommendations(
     profile_name: str, profile: UserProfile, songs: List[Song], k: int = 5
 ) -> None:
@@ -63,14 +76,7 @@ def show_recommendations(
         f"mood={profile.favorite_mood or '(any)'}, energy={profile.target_energy}"
     )
     print("=" * 72)
-    for position, breakdown in enumerate(rank(songs, profile, k=k), start=1):
-        song = breakdown.song
-        print(
-            f"{position}. {song.title} - {song.artist}  "
-            f"({breakdown.total:.2f}/{MAX_SCORE:.2f})"
-        )
-        print(f"   because: {breakdown.text()}")
-    print()
+    print_breakdowns(rank(songs, profile, k=k))
 
 
 def _value_text(value: object) -> str:
@@ -97,48 +103,83 @@ def print_parse(parsed: ParsedRequest, energy: Slot) -> None:
     print(f"Unknown   : {', '.join(parsed.unknown) or '-'}")
 
 
-def ask(text: str) -> int:
+def _evidence_text(hits: Sequence[Hit]) -> str:
+    if not hits:
+        return "(none)"
+    return " | ".join(f"{hit.chunk.citation} {hit.score:.2f}" for hit in hits)
+
+
+def print_result(result: AgentResult, trace: bool = False, songs: Sequence[Song] = ()) -> None:
+    """The whole verdict: what was understood, why, and what came of it."""
+    energy = result.parsed.energy or Slot(
+        value=0.5, source="default (no context given)"
+    )
+    print_parse(result.parsed, energy)
+    print(f"Evidence  : {_evidence_text(result.evidence)}")
+    print(f"Confidence: {result.confidence:.2f}   [{result.decision}]")
+
+    if result.relaxation:
+        print(
+            f"  relax : dropped the {result.relaxation} constraint, "
+            "no track in the catalog matched it"
+        )
+    for issue in result.issues:
+        print(f"  {issue.severity:<5}: {issue.message}")
+
+    if trace:
+        print("  trace :")
+        for step in result.trace:
+            print(f"    {step.name:<9} {step.detail}")
+
+    if result.decision == "clarify":
+        print()
+        print(f"Question  : {clarification(result.parsed, songs)}")
+        return
+
+    if result.decision == "refuse":
+        print()
+        print("No confident match.")
+        if result.recommendations:
+            closest = result.recommendations[0]
+            song = closest.song
+            print(
+                f"  closest : {song.title} - {song.artist} "
+                f"({song.genre}/{song.mood}, energy {song.energy:.2f}, "
+                f"{closest.total:.2f}/{MAX_SCORE:.2f})"
+            )
+        return
+
+    print()
+    print_breakdowns(result.recommendations)
+
+
+def ask(text: str, trace: bool = False) -> int:
     """
     Answer one free-text request.
 
-    Returns 0 when a ranking was produced and 1 when the request was too vague
-    to score, in which case the listener is asked one clarifying question
-    instead of being handed a list built on guesses.
+    Exit codes: 0 answered (with or without a warning), 1 needs more
+    information, 2 no confident match.
     """
-    songs = load_catalog()
-    retriever = Retriever.from_directory()
-    parsed = resolve_request(text, songs, retriever)
-    energy = parsed.energy or Slot(value=0.5, source="default (no context given)")
-
-    print_parse(parsed, energy)
-
-    if parsed.needs_clarification:
-        print()
-        print(f"Question  : {clarification(parsed, songs)}")
-        return 1
-
-    profile = UserProfile(
-        favorite_genre=str(parsed.genre.value) if parsed.genre else "",
-        favorite_mood=str(parsed.mood.value) if parsed.mood else "",
-        target_energy=float(energy.value),
-    )
-    print()
-    show_recommendations("ask", profile, songs)
-    return 0
+    agent = RecommendationAgent(load_catalog(), Retriever.from_directory())
+    result = agent.recommend(text)
+    print_result(result, trace=trace, songs=agent.songs)
+    return {"answer": 0, "caveat": 0, "clarify": 1, "refuse": 2}[result.decision]
 
 
 def main() -> None:
     args = sys.argv[1:]
 
     if args and args[0] == "ask":
-        query = " ".join(args[1:]).strip()
+        rest = [arg for arg in args[1:] if arg != "--trace"]
+        trace = "--trace" in args[1:]
+        query = " ".join(rest).strip()
         if not query:
             print(
                 'Usage: python -m src.main ask "<what you want to listen to>"',
                 file=sys.stderr,
             )
             raise SystemExit(2)
-        raise SystemExit(ask(query))
+        raise SystemExit(ask(query, trace=trace))
 
     songs = load_catalog()
     print(f"Loaded songs: {len(songs)}")
