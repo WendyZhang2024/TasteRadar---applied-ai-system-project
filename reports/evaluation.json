@@ -1,0 +1,144 @@
+{
+  "summary": {
+    "total": 11,
+    "passed": 11,
+    "failed": 0,
+    "by_decision": {
+      "answer": 6,
+      "caveat": 1,
+      "refuse": 2,
+      "clarify": 2
+    },
+    "answered_confidence": {
+      "min": 0.85,
+      "max": 0.96
+    },
+    "refused_confidence": {
+      "min": 0.51,
+      "max": 0.52
+    }
+  },
+  "cases": [
+    {
+      "name": "lofi_study",
+      "request": "chill lofi for late night coding",
+      "expected": "answer",
+      "decision": "answer",
+      "confidence": 0.96,
+      "top_genre": "lofi",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "pop_gym",
+      "request": "high energy pop for the gym",
+      "expected": "answer",
+      "decision": "answer",
+      "confidence": 0.93,
+      "top_genre": "pop",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "romantic_rnb",
+      "request": "romantic r&b",
+      "expected": "answer",
+      "decision": "answer",
+      "confidence": 0.9,
+      "top_genre": "r&b",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "sad_mandopop",
+      "request": "sad mandopop",
+      "expected": "answer",
+      "decision": "answer",
+      "confidence": 0.9,
+      "top_genre": "mandopop",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "chinese_genre",
+      "request": "我想听日语歌",
+      "expected": "answer",
+      "decision": "answer",
+      "confidence": 0.94,
+      "top_genre": "j-pop",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "negated_genre",
+      "request": "anything but rock, something chill",
+      "expected": "answer",
+      "decision": "answer",
+      "confidence": 0.88,
+      "top_genre": "lofi",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "jpop_calm",
+      "request": "calm j-pop",
+      "expected": "caveat",
+      "decision": "caveat",
+      "confidence": 0.85,
+      "top_genre": "j-pop",
+      "relaxation": "mood",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "classical_loud",
+      "request": "classical high energy",
+      "expected": "refuse",
+      "decision": "refuse",
+      "confidence": 0.52,
+      "top_genre": "classical",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "edm_quiet",
+      "request": "edm energy 0.1",
+      "expected": "refuse",
+      "decision": "refuse",
+      "confidence": 0.51,
+      "top_genre": "edm",
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "vague_request",
+      "request": "深夜写代码 别太吵",
+      "expected": "clarify",
+      "decision": "clarify",
+      "confidence": 0.0,
+      "top_genre": null,
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "name": "empty_request",
+      "request": "",
+      "expected": "clarify",
+      "decision": "clarify",
+      "confidence": 0.0,
+      "top_genre": null,
+      "relaxation": null,
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

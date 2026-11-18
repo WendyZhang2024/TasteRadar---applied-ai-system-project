@@ -178,6 +178,39 @@ NEGATION_MARKERS = (
     "不",
 )
 
+# Grammar, not content. These are skipped when reporting what was not
+# understood: "我想听日语歌" is fully understood even though "我想" is not a
+# genre, and counting it as unrecognised used to downgrade a good answer to a
+# warning. The evaluation run is what surfaced this.
+FILLER_WORDS = frozenset(
+    {
+        "我想",
+        "想听",
+        "想找",
+        "想要",
+        "帮我",
+        "给我",
+        "来点",
+        "推荐",
+        "一点",
+        "一些",
+        "something",
+        "anything",
+        "someone",
+        "but",
+        "and",
+        "with",
+        "please",
+        "like",
+        "want",
+        "wanna",
+        "looking",
+        "need",
+        "give",
+        "me",
+    }
+)
+
 NEGATION_WINDOW = 16
 
 EXPLICIT_ENERGY = re.compile(
@@ -351,7 +384,7 @@ def _unknown_terms(text: str, consumed: List[Tuple[int, int]]) -> Tuple[str, ...
 
     seen: List[str] = []
     for token in content_terms(leftover):
-        if token.isdigit() or token in seen:
+        if token.isdigit() or token in seen or token in FILLER_WORDS:
             continue
         seen.append(token)
     return tuple(seen[:5])

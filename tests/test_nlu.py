@@ -155,6 +155,13 @@ def test_unknown_words_are_reported(songs):
     assert "太吵" in parsed.unknown
 
 
+def test_filler_words_are_not_reported_as_unknown(songs):
+    # Regression: "我想听" used to be counted as not understood, which downgraded
+    # a perfectly clear request to a warning.
+    assert parse_request("我想听日语歌", songs).unknown == ()
+    assert parse_request("anything but rock, something chill", songs).unknown == ()
+
+
 def test_empty_text_needs_clarification(songs):
     parsed = parse_request("", songs)
 

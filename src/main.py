@@ -18,6 +18,7 @@ from typing import Dict, List, Sequence
 
 from src.agent import AgentResult, RecommendationAgent
 from src.catalog import CatalogError, load_songs
+from src.evaluate import main as run_evaluation
 from src.nlu import ParsedRequest, Slot, clarification
 from src.recommender import MAX_SCORE, ScoreBreakdown, Song, UserProfile, rank
 from src.retrieval import Hit, Retriever
@@ -168,6 +169,9 @@ def ask(text: str, trace: bool = False) -> int:
 
 def main() -> None:
     args = sys.argv[1:]
+
+    if args and args[0] == "eval":
+        raise SystemExit(run_evaluation())
 
     if args and args[0] == "ask":
         rest = [arg for arg in args[1:] if arg != "--trace"]

@@ -154,10 +154,11 @@ def soft_issues(
             )
         )
 
-    if not hits:
-        issues.append(
-            Issue("no_evidence", "warn", "nothing in the knowledge base matched this request")
-        )
+    # Missing knowledge-base support is deliberately NOT an issue. It already
+    # lowers the confidence through the evidence term, and a request the parser
+    # understood completely does not need a note about the knowledge base: that
+    # would turn a correct answer into a warning for reasons the listener cannot
+    # act on.
 
     if breakdowns:
         counts = {}
