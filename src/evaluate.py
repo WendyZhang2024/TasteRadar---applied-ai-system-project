@@ -252,7 +252,14 @@ def main(output_dir: Path = REPORT_DIR) -> int:
     for outcome in outcomes:
         if not outcome.passed:
             print(f"  FAIL {outcome.case.name}: {'; '.join(outcome.failures)}")
-    print(f"report written to {output_dir}")
+
+    # Relative when possible: an absolute path from one machine would make the
+    # committed assets/eval_run.txt impossible to reproduce anywhere else.
+    try:
+        shown = output_dir.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        shown = str(output_dir)
+    print(f"report written to {shown}/")
     return 0 if summary["failed"] == 0 else 1
 
 

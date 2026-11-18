@@ -33,5 +33,15 @@ flowchart TD
     REFUSE --> TRACE
     ASK --> TRACE
 
-    EVAL["src/evaluate.py<br/>11 labelled requests"] --> CLI
+    %% Humans: the listener is the final check on every verdict.
+    ANSWER --> HUMAN["listener / reviewer<br/>reads reasons + citations,<br/>can disagree with a specific one"]
+    CAVEAT --> HUMAN
+    REFUSE -->|"closest candidate + real attributes"| HUMAN
+    ASK -->|"one question"| HUMAN
+    HUMAN -->|"adds a genre, mood or situation"| REQ
+
+    %% Testing: regression run over labelled requests, plus unit tests.
+    EVAL["src/evaluate.py<br/>11 labelled requests<br/>asserts verdict properties"] -->|"calls the same agent"| CLI
     EVAL --> REPORT[("reports/evaluation.md<br/>reports/evaluation.json")]
+    REPORT -->|"developer reviews<br/>thresholds and failures"| DEV["developer<br/>(human review of tests)"]
+    UNIT["tests/ (75 unit tests)<br/>incl. score-sum invariant"] -.->|"guards"| RANK

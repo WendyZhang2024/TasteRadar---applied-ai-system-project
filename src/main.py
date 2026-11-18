@@ -167,7 +167,17 @@ def ask(text: str, trace: bool = False) -> int:
     return {"answer": 0, "caveat": 0, "clarify": 1, "refuse": 2}[result.decision]
 
 
+def _use_utf8_output() -> None:
+    # Catalog titles and requests contain Chinese and Japanese. A Windows console
+    # defaults to a legacy code page and would print them as mojibake.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 def main() -> None:
+    _use_utf8_output()
     args = sys.argv[1:]
 
     if args and args[0] == "eval":

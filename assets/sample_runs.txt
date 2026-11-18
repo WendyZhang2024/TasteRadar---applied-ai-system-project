@@ -1,0 +1,79 @@
+$ python -m src.main ask "chill lofi for late night coding"
+Request   : chill lofi for late night coding
+Genre     : lofi           <- text: "lofi"
+Mood      : chill          <- text: "chill"
+Context   : study          <- text: "late night"
+Energy    : 0.35           <- text: "chill"
+Excluded  : -
+Unknown   : -
+Evidence  : kb/context_study.md#What to avoid 0.28 | kb/context_study.md#Energy 0.21 | kb/context_study.md#Texture 0.18
+Confidence: 0.96   [answer]
+
+1. Library Rain - Paper Lanterns  (4.00/4.00)
+   because: genre match: lofi (+2.0) | mood match: chill (+1.0) | energy 0.35 vs target 0.35 (gap 0.00, +1.00)
+2. Midnight Coding - LoRoom  (3.93/4.00)
+   because: genre match: lofi (+2.0) | mood match: chill (+1.0) | energy 0.42 vs target 0.35 (gap 0.07, +0.93)
+3. Focus Flow - LoRoom  (2.95/4.00)
+   because: genre match: lofi (+2.0) | mood mismatch: focused vs chill (+0.0) | energy 0.40 vs target 0.35 (gap 0.05, +0.95)
+4. Spacewalk Thoughts - Orbit Bloom  (1.93/4.00)
+   because: genre mismatch: ambient vs lofi (+0.0) | mood match: chill (+1.0) | energy 0.28 vs target 0.35 (gap 0.07, +0.93)
+5. Apocalypse - Cigarettes After Sex  (1.00/4.00)
+   because: genre mismatch: dream pop vs lofi (+0.0) | mood mismatch: melancholy vs chill (+0.0) | energy 0.35 vs target 0.35 (gap 0.00, +1.00)
+
+[exit code: 0]
+
+$ python -m src.main ask "calm j-pop"
+Request   : calm j-pop
+Genre     : j-pop          <- text: "j-pop"
+Mood      : calm           <- text: "calm"
+Context   : (not stated)
+Energy    : 0.50           <- default (no context given)
+Excluded  : -
+Unknown   : -
+Evidence  : kb/genre_jpop.md#The calm j-pop gap 0.61 | kb/genre_jpop.md#Energy 0.35 | kb/genre_jpop.md#When it fits 0.27
+Confidence: 0.85   [caveat]
+  relax : dropped the mood constraint, no track in the catalog matched it
+
+1. 晩餐歌 - tuki.  (2.88/4.00)
+   because: genre match: j-pop (+2.0) | no mood given (+0.0) | energy 0.62 vs target 0.50 (gap 0.12, +0.88)
+2. 打上花火 - DAOKO, 米津玄師  (2.78/4.00)
+   because: genre match: j-pop (+2.0) | no mood given (+0.0) | energy 0.72 vs target 0.50 (gap 0.22, +0.78)
+3. Midnight Coding - LoRoom  (0.92/4.00)
+   because: genre mismatch: lofi vs j-pop (+0.0) | no mood given (+0.0) | energy 0.42 vs target 0.50 (gap 0.08, +0.92)
+4. Focus Flow - LoRoom  (0.90/4.00)
+   because: genre mismatch: lofi vs j-pop (+0.0) | no mood given (+0.0) | energy 0.40 vs target 0.50 (gap 0.10, +0.90)
+5. Coffee Shop Stories - Slow Stereo  (0.87/4.00)
+   because: genre mismatch: jazz vs j-pop (+0.0) | no mood given (+0.0) | energy 0.37 vs target 0.50 (gap 0.13, +0.87)
+
+[exit code: 0]
+
+$ python -m src.main ask "classical high energy"
+Request   : classical high energy
+Genre     : classical      <- text: "classical"
+Mood      : (not stated)
+Context   : (not stated)
+Energy    : 0.90           <- text: "high energy"
+Excluded  : -
+Unknown   : -
+Evidence  : kb/genre_classical.md#Why high-energy classical does not exist here 0.44 | kb/genre_classical.md#Energy 0.29 | kb/mood_intense.md#When it fits 0.15
+Confidence: 0.52   [refuse]
+  warn : no classical track is near 0.90 energy (closest is 0.12: Gymnopédie No.1)
+
+No confident match.
+  closest : Gymnopédie No.1 - Erik Satie (classical/calm, energy 0.12, 2.22/4.00)
+[exit code: 2]
+
+$ python -m src.main ask "深夜写代码 别太吵"
+Request   : 深夜写代码 别太吵
+Genre     : (not stated)
+Mood      : (not stated)
+Context   : study          <- text: "深夜"
+Energy    : 0.33           <- kb/context_study.md#Energy (0.25-0.42)
+Excluded  : -
+Unknown   : 别太, 太吵
+Evidence  : kb/context_study.md#Texture 0.22 | kb/context_study.md#What to avoid 0.21 | kb/context_study.md#Energy 0.19
+Confidence: 0.00   [clarify]
+
+Question  : I need one more clue. Name a genre (lofi, j-pop, pop, ambient, anime rock, cinematic ...) or a mood (chill, energetic, happy, intense, aggressive, calm ...), or a situation like studying or working out.
+[exit code: 1]
+
