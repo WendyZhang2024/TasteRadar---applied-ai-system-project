@@ -11,9 +11,11 @@ Design rule for this module: the recipe lives in exactly ONE place,
 score_song(). Ranking, the explanation text and the Recommender facade are all
 derived from the ScoreBreakdown it returns, so a change to a weight or to a
 match rule can no longer drift between two parallel implementations.
+
+This module does no file I/O. Loading and validating the catalog lives in
+src/catalog.py, which keeps scoring a pure function of (song, profile, weights).
 """
 
-import csv
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -178,32 +180,3 @@ class Recommender:
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
         return self.score(user, song).text()
-
-
-def load_songs(csv_path: str) -> List[Song]:
-    """
-    Load the catalog from a CSV file into Song objects.
-
-    Malformed-row validation is deliberately out of scope here: it lands in the
-    next commit so that THIS commit stays strictly behaviour-preserving.
-    """
-    songs: List[Song] = []
-    # encoding="utf-8" is required: the file contains Japanese and Chinese titles
-    # and Windows would otherwise fall back to GBK and fail.
-    with open(csv_path, "r", encoding="utf-8", newline="") as handle:
-        for row in csv.DictReader(handle):
-            songs.append(
-                Song(
-                    id=int(row["id"]),
-                    title=row["title"],
-                    artist=row["artist"],
-                    genre=row["genre"],
-                    mood=row["mood"],
-                    energy=float(row["energy"]),
-                    tempo_bpm=float(row["tempo_bpm"]),
-                    valence=float(row["valence"]),
-                    danceability=float(row["danceability"]),
-                    acousticness=float(row["acousticness"]),
-                )
-            )
-    return songs

@@ -4,19 +4,21 @@ Command line runner for the Music Recommender Simulation.
 Run from the project root:
     python -m src.main                 # run every profile
     python -m src.main "Chill Lofi"    # run one profile by name
+
+Only `python -m src.main` is supported. Running the file directly would need a
+dual-import fallback in every module of the project, which is a trap rather
+than a feature.
 """
 
-import os
 import sys
+from pathlib import Path
 from typing import Dict, List
 
-try:  # `python -m src.main`
-    from src.recommender import MAX_SCORE, Song, UserProfile, load_songs, rank
-except ModuleNotFoundError:  # `python src/main.py`
-    from recommender import MAX_SCORE, Song, UserProfile, load_songs, rank
+from src.catalog import CatalogError, load_songs
+from src.recommender import MAX_SCORE, Song, UserProfile, rank
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(PROJECT_ROOT, "data", "songs.csv")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA_PATH = PROJECT_ROOT / "data" / "songs.csv"
 
 # Four everyday taste profiles plus one that the catalog cannot satisfy, used to
 # see where the scoring breaks down.
@@ -60,7 +62,13 @@ def show_recommendations(
 
 
 def main() -> None:
-    songs = load_songs(DATA_PATH)
+    try:
+        songs = load_songs(DATA_PATH)
+    except CatalogError as exc:
+        # A broken catalog is a one-line diagnosis, not a traceback.
+        print(f"Could not load the catalog.\n{exc}", file=sys.stderr)
+        raise SystemExit(2)
+
     print(f"Loaded songs: {len(songs)}")
     print()
 
