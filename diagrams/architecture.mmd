@@ -1,0 +1,37 @@
+%% TasteRadar 2.0 -- how one sentence becomes an answer, a warning, a refusal
+%% or a question. Node names mirror the modules in src/.
+flowchart TD
+    REQ["listener writes one sentence<br/>(English or Chinese)"] --> CLI["src/main.py<br/>ask()"]
+
+    CSV[("data/songs.csv<br/>20 songs")] --> LOAD["src/catalog.py<br/>load_songs()<br/>validates every row"]
+    LOAD -->|"CatalogError: file, line, column"| BAD["one-line diagnosis<br/>exit 2"]
+
+    CLI --> PARSE["src/nlu.py<br/>parse_request()"]
+    PARSE -->|"genre / mood / context / excluded / unknown"| RESOLVE["resolve_request()"]
+
+    RESOLVE -->|"energy still empty?"| RET["src/retrieval.py<br/>Retriever.search()"]
+    KB[("knowledge/*.md<br/>8 notes, 24 sections")] --> RET
+    RET -->|"kb/context_study.md#Energy<br/>0.25-0.42"| RESOLVE
+
+    RESOLVE --> GAPS{"src/guardrails.py<br/>catalog_gaps()"}
+    GAPS -->|"no such genre/mood pair"| RELAX["drop the mood, retry once"]
+    RELAX --> RANK
+    GAPS -->|"no hole"| RANK["src/recommender.py<br/>rank() over score_song()"]
+    LOAD --> RANK
+
+    RANK --> CONF{"guardrails.confidence()<br/>fit x support"}
+    RET --> CONF
+    CONF --> DEC{"src/agent.py<br/>_decide()"}
+
+    DEC -->|"fit high, nothing to report"| ANSWER["answer<br/>reasons + citations"]
+    DEC -->|"a constraint was dropped"| CAVEAT["answer + warning<br/>says what it dropped"]
+    DEC -->|"catalog hole or low fit"| REFUSE["refuse<br/>+ closest candidate"]
+    DEC -->|"no genre and no mood"| ASK["clarify<br/>options read from the catalog"]
+
+    ANSWER --> TRACE[("trace steps")]
+    CAVEAT --> TRACE
+    REFUSE --> TRACE
+    ASK --> TRACE
+
+    EVAL["src/evaluate.py<br/>11 labelled requests"] --> CLI
+    EVAL --> REPORT[("reports/evaluation.md<br/>reports/evaluation.json")]

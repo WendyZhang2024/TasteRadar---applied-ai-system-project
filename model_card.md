@@ -1,200 +1,109 @@
-# 🎧 Model Card: Music Recommender Simulation
+# 🎧 Model Card: TasteRadar 2.0
 
-## 1. Model Name
+## 1. Model name
 
-**TasteRadar 1.0**
+TasteRadar 2.0
 
-The name is literal. The model sweeps a small catalog and reports whatever sits
-closest to where the listener points it. It does not learn, remember, or adapt: it
-sweeps once and returns a ranked list.
+TasteRadar 1.0 scored a 20-song catalog against three numbers and reported the closest matches. Version 2.0 keeps that scoring and adds what a real assistant needs around it. It reads a sentence, looks things up in a written knowledge base, and decides whether the answer it can produce is worth giving at all.
 
----
+## 2. What this is built on
 
-## 2. Intended Use
+This model card covers the extension of TasteRadar 1.0, my Modules 1–3 content-based recommender. The scoring recipe is unchanged: genre +2.0, mood +1.0, energy +1.0 × (1 − |gap|), for a maximum of 4.0. I left the arithmetic alone because the real failure was never in the numbers. The system simply had no way to say "I don't have that" or "I didn't understand you."
 
-The project is framed around a question a startup music platform would ask: how do
-apps like Spotify or TikTok decide what a user will love next, and can the smallest
-honest version of that idea be rebuilt and inspected? TasteRadar 1.0 is that
-prototype. It turns a song catalog plus a listener's stated taste profile into a
-ranked list of five suggestions, and it records the reason for every pick, so the
-whole path from data to prediction can be followed by hand.
+Everything around the score changed. Input is now a sentence instead of a hand-written dictionary. Missing details are filled in from a knowledge base. A verdict layer sits between the ranking and the user.
 
-It simulates the shape of a real recommender for classroom exploration, not for
-production. It assumes the listener can name their taste precisely — one genre,
-one mood, one energy target — and that those three do not contradict each other.
-Real platforms never get that convenience: they infer taste from behavior instead
-of asking for it, which is the larger problem this simulation deliberately skips.
+## 3. Intended use
 
-What it is for:
+**For:** demonstrating what a recommender looks like once it is allowed to be uncertain. It shows how a ranking turns into a decision, and where that decision goes wrong when the catalog is thin.
 
-- Showing how raw song attributes turn into a score and then into a ranking.
-- Comparing the same ranking across different kinds of listeners.
-- Making the failure cases visible, since the bias discussion lives there.
+**Not for:** real listeners, production traffic, or any claim about musical taste. It returns 5 of 20 songs, a quarter of the catalog, and I tagged all 20 myself.
 
-What it is not for:
+It also assumes the listener can say something: a genre, a mood, or a situation. A request with none of these gets a question instead of an answer. That is correct, but slower than people expect from a search box.
 
-- Not for real users or production traffic. Returning 5 of 20 songs spends a
-  quarter of the catalog on one request.
-- Not for inferring taste from behavior. No history, skips, repeats or likes are
-  read.
-- Not for vague or mixed requests. "Something chill but not too sad" cannot be
-  expressed in three numbers.
-- Not for discovery. It only ever surfaces what already resembles the target, so
-  it cannot introduce a listener to a genre they have not named.
+## 4. How it works
 
----
+Five steps, each in its own module so each can be tested alone.
 
-## 3. How the Model Works
+1. **Parse** (`src/nlu.py`). A hand-written table maps what people type onto the catalog's labels, in English and Chinese. The longest alias wins, so "indie pop" beats "pop" and "j-pop" does not trigger "pop". Negations ("anything but rock") become exclusions. Words that match nothing are recorded, not dropped.
+2. **Retrieve** (`src/retrieval.py`). TF-IDF over 8 markdown notes split into 24 sections. Chinese is matched through character bigrams, which is how "深夜写代码" ("late-night coding") finds a note that contains those words only separately.
+3. **Score** (`src/recommender.py`). A single implementation of the recipe that returns a per-rule breakdown. Both the ranking and the explanation read from it.
+4. **Check** (`src/guardrails.py`). This step looks for two kinds of problem. *Catalog holes* are facts read directly off the data: a genre that does not exist, a mood that does not exist, a genre/mood pair with no track, or an energy level no track in that genre comes near. *Confidence* is computed as fit × (0.80 + 0.20 × support), where fit is how much of the stated request the best candidate satisfies.
+5. **Decide** (`src/agent.py`). Four possible outcomes: answer, answer with a warning, refuse, or ask. One revision is allowed. If the requested genre/mood pair does not exist, the mood constraint is dropped once, and the output says so.
 
-Three pieces, kept separate on purpose.
+## 5. Data
 
-**Input features.** Every song in the catalog carries attributes. Only three are
-scored: genre (a label), mood (a label) and energy (a number from 0 to 1). Tempo,
-valence, danceability and acousticness are loaded too, but they never affect a
-score.
+Two datasets, both small and both mine.
 
-**User preferences.** A taste profile restates the same three things from the
-listener's side: favorite genre, favorite mood, target energy.
+**The catalog:** 20 songs, 16 genres, 15 moods. Ten rows came from the course starter file. I added ten from my own playlist (j-pop, piano, soundtracks), so the catalog leans toward my taste before anything is scored. Energy, valence, danceability and acousticness are hand-assigned estimates of how a track feels, not measurements.
 
-**Scoring rule.** A judge with a short checklist walks each song past the profile.
-Genre match earns 2 points, mood match earns 1, and energy earns up to 1 more
-depending on how close it sits to the target. An exact energy match gets the full
-point, a song at the opposite end of the scale gets almost nothing, and direction
-does not matter: a target of 0.2 with a track at 0.25 scores the same as a target
-of 0.8 with a track at 0.85. The ceiling is 4 points.
+**The knowledge base:** 8 notes (four genres, two moods, two situations), written by hand and derived from the catalog rather than from Wikipedia. For example, the study note gives an energy range of 0.25–0.42 because the three lo-fi tracks sit at 0.35, 0.40 and 0.42. If the notes and the data disagreed, the system would cite a rule the catalog does not follow.
 
-Genre is worth the most because it is the hardest boundary. Someone who wants
-quiet music is not served by a metal track no matter how well the energy lines up,
-while mood separates two songs that are equally energetic but feel nothing alike.
+**What is missing:** lyrics, era, popularity, skip behavior, and any signal from actual listening. Nothing here describes a real user.
 
-**Ranking rule.** Scoring happens one song at a time, with no knowledge of the
-others. Ranking is the second step: all twenty scores get sorted and the top five
-are returned. A number like 2.87 means very little until it sits next to the rest
-of the list, which is why the two steps stay apart. This ordering is the prediction
-the whole system produces; there is nothing else.
+## 6. Strengths
 
-The starter code returned the first five rows of the CSV with no scoring at all.
-The finished version scores every song, records the points awarded for each pick,
-and ranks the results.
+- **It can decline.** This is the clearest improvement over 1.0. "Classical high energy" now returns a refusal, the closest candidate, and that candidate's real energy, instead of a calm piano piece ranked first.
+- **Every number has a source.** Output such as `Energy: 0.33 <- kb/context_study.md#Energy (0.25-0.42)` is printed, not implied, so a listener can dispute a specific citation.
+- **It says what it dropped.** When the mood constraint is relaxed, the caveat names it. The failure I most wanted to avoid was quietly answering a different question.
+- **It is deterministic and offline.** There is no model, no key and no network. Two runs produce byte-identical reports, which is what makes the evaluation meaningful.
 
----
+## 7. Limitations and biases
 
-## 4. Data
+- **The catalog is the real limit.** 13 of 16 genres appear exactly once. Two of the eleven evaluation cases end in refusal, and both reflect gaps in the data, not flaws in the logic.
+- **A genre match nearly vetoes everything else.** At 2.0 points on its own, it outweighs a wrong mood and a wrong energy combined. The guardrails now name this bias but do not remove it.
+- **Retrieval is lexical.** "Workout" and "training" are unrelated unless both appear in a note's tags. There is no stemming and no synonym table beyond what I wrote.
+- **The parser is a word table.** Anything outside it is reported as unknown and lowers confidence. That is honest but brittle: a listener who says "something for the rain" gets a question.
+- **Negation detection is crude.** It is a 16-character lookback, so "这首歌不错" ("this song isn't bad") reads as a negation because of the "不". This is a known, unfixed bug, and it is easy to hit in ordinary Chinese.
+- **The refusal thresholds (0.55 / 0.70) were set before the evaluation set existed.** In the current 11 cases, answered requests score 0.85–0.96 and refused ones 0.51–0.52. The exact boundary therefore carries no weight, which is another way of saying the calibration evidence is thin.
 
-The catalog holds 20 songs across 16 genres and 15 moods.
+## 8. Could this be misused, and how is that prevented?
 
-Ten rows came with the course starter file. I added ten more because the original
-set had two clear holes: nothing between 0.45 and 0.75 energy, and no j-pop, anime
-rock, classical, cinematic, dream pop, edm, R&B or mandopop at all. All ten
-additions came from my own playlist, which is mostly j-pop, piano and soundtrack
-music, so the catalog now leans toward my own taste.
+The likely misuse is treating a ranked list as a recommendation. A 20-song catalog will always produce five results, and someone could read "it gave me five songs" as "it found five good songs."
 
-The energy, valence, danceability and acousticness values are hand-assigned
-estimates of how each track feels, not measurements from an audio API. They are
-consistent with each other, but they are my judgement rather than data.
+Three things push against that:
 
-What the dataset does not contain:
+- The verdict is printed with every result, not just logged: `[answer]`, `[caveat]` or `[refuse]`.
+- A caveat must name the constraint it dropped.
+- A refusal always shows the closest candidate with its real attributes, so a wrong answer is visibly wrong.
 
-- Lyrics, language, era, or release year
-- Popularity, or how often a song gets skipped
-- Artist as a scored feature (the artist name is stored but never used)
-- Independence between features: most calm songs are also low energy, so genre,
-  mood and energy partly measure the same thing
+The opposite misuse deserves a mention too: a refusal can hide how small the catalog is. "No confident match" and "I don't know" are different statements, and the report keeps them apart by listing which catalog hole caused which refusal.
 
----
+There is no personal data here, so the usual privacy risks do not apply. The bias risk does. The catalog encodes my taste, and a system that only recommends what already resembles the target can never introduce anyone to something new.
 
-## 5. Strengths
+## 9. Evaluation
 
-- **Extreme targets behave correctly.** Because energy is scored by distance
-  rather than height, a listener who wants calm gets the quietest tracks and a
-  listener who wants intensity gets the loudest ones. A "higher is better" rule
-  would have failed half the users.
-- **Clear matches are found and ranked sensibly.** For the Chill Lofi profile the
-  top three are the three lofi tracks (3.95, 3.88, 2.90), in the order I would
-  have picked by hand. For Intense Rock the top pick scores 3.99 of 4.00.
-- **Every result can be explained.** Each score reads back as a short list of
-  points awarded ("genre +2.0, mood +0.0, energy +0.98"). There is no moment where
-  a song appears for no stated reason.
-- **The same recipe runs in two places.** The class version and the function
-  version share the weights, so the CLI output and the tests agree on how a song
-  is scored.
-- **The weights are adjustable in one place.** The comparison experiments in the
-  README only needed the three weight values changed, with no rewrite of the logic.
+`python -m src.main eval` runs 11 labelled requests end to end and writes `reports/evaluation.md` and `.json`. Each case asserts a property of the verdict (decision, top genre, whether the mood was relaxed, confidence bounds) and never the wording, so the table survives copy changes.
 
----
+**Current result:** 11/11, made up of 6 answers, 1 caveat, 2 refusals and 2 questions. The full unit suite has 75 tests.
 
-## 6. Limitations and Bias
+**What the evaluation deliberately does not check:** whether a good answer is also a good song. It checks that the stated constraints are met and that the verdict matches the label. "Is this a nice track?" cannot be measured on 20 rows, and I won't pretend otherwise.
 
-The clearest weakness is that a genre match is worth 2.0 and nothing else comes
-close: a user who asks for euphoric 0.90-energy classical music is handed
-Gymnopédie No.1, a calm piano piece at energy 0.12, purely because its genre tag
-matches. On the other side of the same problem, a user who is not in the catalog
-at all gets a list ordered almost entirely by energy, which is why Intense Rock
-falls back to pop and edm tracks rather than saying "I have nothing like this".
-The dataset makes this worse, because 13 of the 16 genres appear exactly once,
-lofi alone accounts for 3 songs, and half the catalog sits below 0.45 energy.
-Some moods are tied to a single genre, so `calm` only exists on a classical track
-and `energetic` only on j-pop, which means a calm j-pop listener can never be
-matched and is served energetic songs instead. Finally, the system has no notion
-of diversity or repetition: the same lofi tracks win every quiet request, and
-nothing prevents five near-duplicates from filling the whole list.
+## 10. What surprised me while testing reliability
 
----
+On its first run, the evaluation failed 5 of 11 cases, and none of the failures were crashes.
 
-## 7. Evaluation
+"我想听日语歌" ("I want to hear some Japanese songs") came back with a warning instead of an answer. The cause: 我想 ("I want") and 想听 ("to hear") were being counted as words the system did not understand. That lowered confidence and turned a correct answer into a caveat. The same thing happened to "something" and "but" in English.
 
-I tested five profiles: High-Energy Pop (`pop / happy / 0.85`), Chill Lofi
-(`lofi / chill / 0.30`), Intense Rock (`rock / intense / 0.90`), J-Pop Calm
-(`j-pop / calm / 0.40`), and one impossible combination
-(`classical / euphoric / 0.90`) built on purpose to be unsatisfiable.
+What surprised me is that the parser's own unit tests were all green. They checked what the parser produced (genre, mood, energy), and every value was right. None of them asked whether a complete, ordinary sentence could pass through without being marked as partly incomprehensible. Twenty passing tests, and the behavior was wrong for the most natural way of asking.
 
-For each one I checked four things: whether the top result was the song I would
-have picked by hand, whether every score could be traced back to the rules, whether
-songs from outside the target genre appeared for a reason, and whether the energy
-ordering moved in the right direction when I changed the target.
+Two things came out of this: a filler-word list, and a much lower opinion of "the tests pass" as evidence.
 
-What surprised me most was the impossible profile. I expected a weak answer and
-got Gymnopédie No.1 at 2.22, ahead of every other song in the catalog, including
-the ones that matched the energy request. The second surprise was J-Pop Calm: it
-returned two energetic j-pop songs before reaching a genuinely calm track, because
-both j-pop entries are tagged `energetic`. That is a data gap that looks exactly
-like a scoring bug from the outside.
+The second surprise was how much of the reliability work was about wording instead of numbers. I added a `relax:` line, and I changed `mood mismatch: energetic vs (+0.0)` to `no mood given (+0.0)`. Neither change affected the ranking, but both completely changed whether a reader could trust the output.
 
-I ran two comparisons. Halving genre to 1.0 and doubling energy to 2.0 kept the
-ranking order but collapsed the gaps, with Rooftop Lights rising from 1.91 to 2.82
-and almost catching Gym Hero at 2.84. Removing the mood term entirely dropped
-Rooftop Lights from rank 3 to rank 5 while leaving Gym Hero untouched, which showed
-that the mood points only matter for songs whose genre is already wrong.
+## 11. How I worked with AI
 
----
+**A suggestion I accepted.** The instructor's feedback on my Module 1–3 submission pointed out that the scoring recipe existed twice: once in `Recommender._score` / `explain_recommendation` on dataclass objects, and once in `score_song` / `recommend_songs` on dictionaries. The weights were shared, but the tie-breaking, the match checks and the explanation strings were duplicated line for line.
 
-## 8. Future Work
+I accepted the point and went further than deleting one copy. Scoring now returns a `ScoreBreakdown` of per-rule items, and the explanation text is rendered from those items instead of being recomputed. Ranking and explanation cannot disagree because they read the same object. I also added an invariant test that sums the per-rule points across the whole catalog and compares them to the total, so the duplication cannot creep back unnoticed.
 
-- **Diversity penalty.** If an artist or genre already appears in the top five,
-  subtract points from later entries. Quiet requests currently return the same
-  three lofi tracks every time.
-- **A way to refuse.** When the best score falls below a threshold, return fewer
-  songs or say "nothing here matches that" instead of five weak answers. The
-  impossible profile is the case this would fix.
-- **A feedback loop.** Let a listener reject a song and nudge the weights, instead
-  of typing three numbers up front and never touching them again.
-- **Use the data that is already there.** Valence, tempo, danceability and
-  acousticness are loaded into every song but never scored. Acousticness alone
-  would separate the electronic and orchestral tracks that currently tie.
-- **Replace the estimate with a measurement.** Pull real audio features from an
-  API so the scores rest on data rather than my own judgement of each track.
+**A suggestion I rejected.** The obvious way to make this a "real" RAG system is to call a language model: embed the knowledge base, embed the query, generate the explanation. I rejected that for two reasons. First, the graded artifact has to run for anyone who clones the repository, with no API key, no network and no model download. An evaluation that only works on my machine is not an evaluation. Second, at 8 notes and 24 sections, TF-IDF already retrieves the right section for all eleven cases. A model would have added a dependency and an uncontrollable source of variation without moving a single number.
 
----
+I made the same call on a smaller problem. "放松的音乐" ("relaxing music") matched the lo-fi note instead of the chill-mood note because of "音乐" ("music"). I fixed it with a five-word noise list instead of a better model. The corpus is too small for statistics to solve this, and a hand-written list is something I can read and correct.
 
-## 9. Personal Reflection
+## 12. Future work
 
-What I did not expect: cutting the genre weight in half barely moved the ranking
-order, it just squeezed the gaps, while deleting the mood term dropped one song
-four places. A weight I assumed was structural turned out to matter less than a
-weight I thought was decoration. And a genre tag worth 2.0 is enough to outvote a
-wrong mood and a wrong energy at the same time, which explains how easy it is to
-end up cycling the same few songs.
-
-If I kept going, I would make the system able to return nothing. Right now it
-always answers, and a recommender that always answers is claiming more confidence
-than it has.
+- **Let the system return nothing at all.** It can refuse now, but it still always shows a closest candidate. Sometimes the honest answer is "there is nothing here."
+- **Grow the catalog before growing the model.** Two of the eleven cases fail for lack of data. More rows would improve this system more than any change to the scoring.
+- **Add a diversity penalty.** Quiet requests still return the same three lo-fi tracks.
+- **Use what is already loaded.** Valence, tempo, danceability and acousticness are read but never scored.
+- **Replace the hand-tagged estimates with measured audio features,** so the scores rest on data instead of my judgment.
