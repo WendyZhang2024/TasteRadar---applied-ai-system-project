@@ -17,7 +17,7 @@ src/catalog.py, which keeps scoring a pure function of (song, profile, weights).
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -97,27 +97,34 @@ class ScoreBreakdown:
         return " | ".join(item.detail for item in self.items)
 
 
+def _label_term(
+    name: str, value: str, wanted: str, points_on_match: float
+) -> Tuple[float, str, Optional[bool]]:
+    """
+    One yes/no rule: genre or mood.
+
+    An empty `wanted` means the listener never stated this field, which is not
+    the same as stating it and missing. That distinction is kept in `matched`
+    (None rather than False) because the reliability layer counts how many
+    explicit constraints a result satisfies.
+    """
+    if not wanted:
+        return 0.0, f"no {name} given (+0.0)", None
+    if value == wanted:
+        return points_on_match, f"{name} match: {value} (+{points_on_match})", True
+    return 0.0, f"{name} mismatch: {value} vs {wanted} (+0.0)", False
+
+
 def score_song(
     song: Song, profile: UserProfile, weights: Weights = DEFAULT_WEIGHTS
 ) -> ScoreBreakdown:
     """Score one song against one profile. The single implementation of the recipe."""
-    genre_hit = song.genre == profile.favorite_genre
-    genre_points = weights.genre if genre_hit else 0.0
-    if genre_hit:
-        genre_detail = f"genre match: {song.genre} (+{genre_points})"
-    else:
-        genre_detail = (
-            f"genre mismatch: {song.genre} vs {profile.favorite_genre} (+{genre_points})"
-        )
-
-    mood_hit = song.mood == profile.favorite_mood
-    mood_points = weights.mood if mood_hit else 0.0
-    if mood_hit:
-        mood_detail = f"mood match: {song.mood} (+{mood_points})"
-    else:
-        mood_detail = (
-            f"mood mismatch: {song.mood} vs {profile.favorite_mood} (+{mood_points})"
-        )
+    genre_points, genre_detail, genre_matched = _label_term(
+        "genre", song.genre, profile.favorite_genre, weights.genre
+    )
+    mood_points, mood_detail, mood_matched = _label_term(
+        "mood", song.mood, profile.favorite_mood, weights.mood
+    )
 
     gap = abs(song.energy - profile.target_energy)
     energy_points = weights.energy * (1 - gap)
@@ -127,8 +134,8 @@ def score_song(
     )
 
     items = [
-        ScoreItem(rule="genre", points=genre_points, detail=genre_detail, matched=genre_hit),
-        ScoreItem(rule="mood", points=mood_points, detail=mood_detail, matched=mood_hit),
+        ScoreItem(rule="genre", points=genre_points, detail=genre_detail, matched=genre_matched),
+        ScoreItem(rule="mood", points=mood_points, detail=mood_detail, matched=mood_matched),
         ScoreItem(rule="energy", points=energy_points, detail=energy_detail, matched=None),
     ]
     total = round(genre_points + mood_points + energy_points, 2)
